@@ -59,6 +59,155 @@ public abstract class SLAE
       }
    }
 
+   protected void ForwardElimination()
+   {
+      for (int i = 0; i < matrix.Size; i++)
+      {
+         for (int j = matrix.Ig[i]; j < matrix.Ig[i + 1]; j++)
+         {
+            solution[i] -= matrix.Ggl[j] * solution[matrix.Jg[j]];
+         }
+
+         solution[i] /= matrix.Di[i];
+      }
+   }
+
+   protected void BackwardSubstitution()
+   {
+      for (int i = matrix.Size - 1; i >= 0; i--)
+      {
+         for (int j = matrix.Ig[i + 1] - 1; j >= matrix.Ig[i]; j--)
+         {
+            solution[matrix.Jg[j]] -= matrix.Ggu[j] * solution[i];
+         }
+      }
+   }
+
+   public void PrintSolution()
+   {
+      for(int i = 0; i < solution.Length; i++)
+      {
+         Console.WriteLine(solution[i]);
+      }
+   }
+}
+
+public class LOSSolver : SLAE
+{
+   private double eps = 1e-30;
+   private int maxIters = 2000;
+   public override Vector Solve()
+   {
+      solution = new(vector.Length);
+      Vector.Copy(vector, solution);
+
+
+      Vector r = vector - matrix * solution;
+      Vector z = 1 * r;
+      Vector p = matrix * z;
+      Vector tmp;
+      double alpha;
+      double beta;
+
+      Stopwatch sw = Stopwatch.StartNew();
+
+      double nevyaz = r * r;
+
+
+      for (int i = 1; i <= maxIters & nevyaz > eps; i++)
+      {
+         alpha = (p * r) / (p * p);
+         solution += alpha * z;
+
+         r -= alpha * p;
+         tmp = matrix * r;
+
+         beta = -(p * tmp) / (p * p);
+
+         z = r + beta * z;
+         p = tmp + beta * p;
+
+         nevyaz = r * r;
+      }
+
+      sw.Stop();
+      time = sw.ElapsedMilliseconds;
+
+      return solution;
+   }
+}
+
+public class LUSolver : SLAE
+{
+   public override Vector Solve()
+   {
+      solution = new(vector.Length);
+      Vector.Copy(vector, solution);
+      matrix = matrix.ConvertToProfile();
+
+      Stopwatch sw = Stopwatch.StartNew();
+
+      LU();
+      ForwardElimination();
+      BackwardSubstitution();
+
+      sw.Stop();
+      time = sw.ElapsedMilliseconds;
+
+      return solution;
+   }
+}
+
+public class LOSLUSolver : SLAE
+{
+   private double eps = 1e-16;
+   private int maxIters = 2000;
+   public override Vector Solve() 
+   {
+      solution = new(vector.Length);
+      Vector.Copy(vector, solution);
+
+      SparseMatrix matrixLU = new(matrix.Size, matrix.Jg.Length);
+      SparseMatrix.Copy(matrix, matrixLU);
+
+      //matrixLU = matrixLU.ConvertToProfile();
+
+      LU(matrixLU);
+
+      Vector r = DirElim(matrixLU, vector - matrix * solution);
+      Vector z = BackSub(matrixLU, r);
+      Vector p = DirElim(matrixLU, matrix * z);
+      Vector tmp;
+      double alpha;
+      double beta;
+
+      Stopwatch sw = Stopwatch.StartNew();
+
+      double nevyaz = r * r;
+
+
+      for (int i = 1; i <= maxIters & nevyaz > eps; i++)
+      {
+         alpha = (p * r) / (p * p);
+         solution += alpha * z;
+
+         r -= alpha * p;
+
+         tmp = DirElim(matrixLU, matrix * BackSub(matrixLU, r));
+         beta = -(p * tmp) / (p * p);
+
+         z = BackSub(matrixLU, r) + beta * z;
+         p = tmp + beta * p;
+
+         nevyaz = r * r;
+      }
+
+      sw.Stop();
+      time = sw.ElapsedMilliseconds;
+
+      return solution;
+   }
+
    protected static void LU(SparseMatrix Matrix)
    {
       for (int i = 0; i < Matrix.Size; i++)
@@ -99,30 +248,6 @@ public abstract class SLAE
       }
    }
 
-   protected void ForwardElimination()
-   {
-      for (int i = 0; i < matrix.Size; i++)
-      {
-         for (int j = matrix.Ig[i]; j < matrix.Ig[i + 1]; j++)
-         {
-            solution[i] -= matrix.Ggl[j] * solution[matrix.Jg[j]];
-         }
-
-         solution[i] /= matrix.Di[i];
-      }
-   }
-
-   protected void BackwardSubstitution()
-   {
-      for (int i = matrix.Size - 1; i >= 0; i--)
-      {
-         for (int j = matrix.Ig[i + 1] - 1; j >= matrix.Ig[i]; j--)
-         {
-            solution[matrix.Jg[j]] -= matrix.Ggu[j] * solution[i];
-         }
-      }
-   }
-
    protected static Vector DirElim(SparseMatrix Matrix, Vector b)
    {
       Vector result = new Vector(b.Length);
@@ -132,7 +257,7 @@ public abstract class SLAE
       {
          for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
          {
-            result[i] -= Matrix.Ggl[j] * b[Matrix.Jg[j]];
+            result[i] -= Matrix.Ggl[j] * result[Matrix.Jg[j]];
          }
 
          result[i] /= Matrix.Di[i];
@@ -150,46 +275,18 @@ public abstract class SLAE
       {
          for (int j = Matrix.Ig[i + 1] - 1; j >= Matrix.Ig[i]; j--)
          {
-            result[Matrix.Jg[j]] -= Matrix.Ggu[j] * b[i];
+            result[Matrix.Jg[j]] -= Matrix.Ggu[j] * result[i];
          }
       }
 
       return result;
    }
 
-   public void PrintSolution()
-   {
-      for(int i = 0; i < solution.Length; i++)
-      {
-         Console.WriteLine(solution[i]);
-      }
-   }
 }
 
-public class LUSolver : SLAE
+public class LOSLUsqSolver : SLAE
 {
-   public override Vector Solve()
-   {
-      solution = new(vector.Length);
-      Vector.Copy(vector, solution);
-      matrix = matrix.ConvertToProfile();
-
-      Stopwatch sw = Stopwatch.StartNew();
-
-      LU();
-      ForwardElimination();
-      BackwardSubstitution();
-
-      sw.Stop();
-      time = sw.ElapsedMilliseconds;
-
-      return solution;
-   }
-}
-
-public class LOSLUSolver : SLAE
-{
-   private double eps = 1e-100;
+   private double eps = 1e-16;
    private int maxIters = 2000;
    public override Vector Solve() 
    {
@@ -198,6 +295,10 @@ public class LOSLUSolver : SLAE
 
       SparseMatrix matrixLU = new(matrix.Size, matrix.Jg.Length);
       SparseMatrix.Copy(matrix, matrixLU);
+
+      //matrixLU = matrixLU.ConvertToProfile();
+
+      LUsq(matrixLU);
 
       Vector r = DirElim(matrixLU, vector - matrix * solution);
       Vector z = BackSub(matrixLU, r);
@@ -208,9 +309,7 @@ public class LOSLUSolver : SLAE
 
       Stopwatch sw = Stopwatch.StartNew();
 
-      LU(matrixLU);
-
-      double nevyaz = r * r / vector.Norm();
+      double nevyaz = r * r;
 
 
       for (int i = 1; i <= maxIters & nevyaz > eps; i++)
@@ -226,7 +325,7 @@ public class LOSLUSolver : SLAE
          z = BackSub(matrixLU, r) + beta * z;
          p = tmp + beta * p;
 
-         nevyaz = r * r / vector.Norm();
+         nevyaz = r * r;
       }
 
       sw.Stop();
@@ -234,49 +333,84 @@ public class LOSLUSolver : SLAE
 
       return solution;
    }
-}
 
-public class LOSSolver : SLAE
-{
-   private double eps = 1e-16;
-   private int maxIters = 2000;
-   public override Vector Solve()
+   protected static void LUsq(SparseMatrix Matrix)
    {
-      solution = new(vector.Length);
-      Vector.Copy(vector, solution);
-
-
-      Vector r = vector - matrix * solution;
-      Vector z = 1 * r;
-      Vector p = matrix * z;
-      Vector tmp;
-      double alpha;
-      double beta;
-
-      Stopwatch sw = Stopwatch.StartNew();
-
-      double nevyaz = r * r / vector.Norm();
-
-
-      for (int i = 1; i <= maxIters & nevyaz > eps; i++)
+      for (int i = 0; i < Matrix.Size; i++)
       {
-         alpha = (p * r) / (p * p);
-         solution += alpha * z;
 
-         r -= alpha * p;
-         tmp = matrix * r;
+         for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
+         {
+            int jCol = Matrix.Jg[j];
+            int jk = Matrix.Ig[jCol];
+            int k = Matrix.Ig[i];
 
-         beta = -(p * tmp) / (p * p);
+            int sdvig = Matrix.Jg[Matrix.Ig[i]] - Matrix.Jg[Matrix.Ig[jCol]];
 
-         z = r + beta * z;
-         p = tmp + beta * p;
+            if (sdvig > 0)
+               jk += sdvig;
+            else
+               k -= sdvig;
 
-         nevyaz = r * r / vector.Norm();
+            double sumL = 0.0;
+            double sumU = 0.0;
+
+            for (; k < j && jk < Matrix.Ig[jCol + 1]; k++, jk++)
+            {
+               sumL += Matrix.Ggl[k] * Matrix.Ggu[jk];
+               sumU += Matrix.Ggu[k] * Matrix.Ggl[jk];
+            }
+
+            Matrix.Ggl[j] -= sumL;
+            Matrix.Ggl[j] /= Matrix.Di[jCol];
+            Matrix.Ggu[j] -= sumU;
+            Matrix.Ggu[j] /= Matrix.Di[jCol];
+         }
+
+         double sumD = 0.0;
+         for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
+            sumD += Matrix.Ggl[j] * Matrix.Ggu[j];
+
+         Matrix.Di[i] = Math.Sqrt(Matrix.Di[i] - sumD);
+      }
+   }
+
+   protected static Vector DirElim(SparseMatrix Matrix, Vector b)
+   {
+      Vector result = new Vector(b.Length);
+      Vector.Copy(b, result);
+
+      for (int i = 0; i < Matrix.Size; i++)
+      {
+         for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
+         {
+            result[i] -= Matrix.Ggl[j] * result[Matrix.Jg[j]];
+         }
+
+         result[i] /= Matrix.Di[i];
       }
 
-      sw.Stop();
-      time = sw.ElapsedMilliseconds;
-
-      return solution;
+      return result;
    }
+
+   protected static Vector BackSub(SparseMatrix Matrix, Vector b)
+   {
+      Vector result = new Vector(b.Length);
+      Vector.Copy(b, result);
+
+      for (int i = Matrix.Size - 1; i >= 0; i--)
+      {
+         result[i] /= Matrix.Di[i];
+
+         for (int j = Matrix.Ig[i + 1] - 1; j >= Matrix.Ig[i]; j--)
+         {
+            result[Matrix.Jg[j]] -= Matrix.Ggu[j] * result[i];
+         }
+
+
+      }
+
+      return result;
+   }
+
 }

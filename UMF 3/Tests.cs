@@ -30,9 +30,9 @@ public class Test1 : Test
    public Test1(Grid grid) : base(grid) { }
 
    public override double Us(Point3D point) 
-      => point.X;
+      => point.X + point.Y + point.Z;
    public override double Uc(Point3D point) 
-      => point.Y;
+      => point.Z - point.X - point.Y;
    protected override double divGradUs(Point3D point)
       => 0;
    protected override double divGradUc(Point3D point)
