@@ -285,4 +285,43 @@ public class FEM
       Console.WriteLine($"{slae.time}");
       Console.WriteLine();
    }
+
+   public void PrintSolution(StreamWriter sw)
+   {
+      sw.WriteLine(slae.GetType().ToString() == "UMF_3.LUSolver" ? "LU" : "LOS");
+      //Console.WriteLine("Численное решение");
+      for (int i = 0; i < solution.Length; i++)
+      {
+         //if (!grid.Boundaries.Contains(i / 2))
+         //   Console.WriteLine(solution[i]);
+      }
+      Vector exactSolution = new(2 * grid.Nodes.Length);
+      //Console.WriteLine("Точное решение");
+      for (int i = 0; i < exactSolution.Length / 2; i++)
+      {
+         exactSolution[2 * i] = test.Us(grid.Nodes[i]);
+         exactSolution[2 * i + 1] = test.Uc(grid.Nodes[i]);
+         //if (!grid.Boundaries.Contains(i / 2))
+         //   Console.WriteLine($"{exactSolution[2 * i]}\n{exactSolution[2 * i + 1]}");
+      }
+      //Console.WriteLine("Погрешность");
+      Vector inaccuracySin = new(grid.Nodes.Length);
+      Vector inaccuracyCos = new(grid.Nodes.Length);
+      for (int i = 0; i < inaccuracySin.Length; i++)
+      {
+         if (!grid.Boundaries.Contains(i / 2))
+         {
+            inaccuracySin[i] = exactSolution[2 * i] - solution[2 * i];
+            inaccuracyCos[i] = exactSolution[2 * i + 1] - solution[2 * i + 1];
+            //Console.WriteLine($"{inaccuracy[i]}");
+         }
+      }
+      sw.WriteLine("Относительная погрешность синус-компоненты");
+      sw.WriteLine($"{inaccuracySin.Norm() / exactSolution.Norm()}");
+      sw.WriteLine("Относительная погрешность косинус-компоненты");
+      sw.WriteLine($"{inaccuracyCos.Norm() / exactSolution.Norm()}");
+      sw.WriteLine("Время");
+      sw.WriteLine($"{slae.time}");
+      sw.WriteLine();
+   }
 }

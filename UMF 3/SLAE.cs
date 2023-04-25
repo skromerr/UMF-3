@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Numerics;
 
 namespace UMF_3;
@@ -94,7 +95,7 @@ public abstract class SLAE
 
 public class LOSSolver : SLAE
 {
-   private double eps = 1e-30;
+   private double eps = 1e-16;
    private int maxIters = 2000;
    public override Vector Solve()
    {
@@ -286,8 +287,8 @@ public class LOSLUSolver : SLAE
 
 public class LOSLUsqSolver : SLAE
 {
-   private double eps = 1e-16;
-   private int maxIters = 2000;
+   protected double eps = 1e-16;
+   protected int maxIters = 2000;
    public override Vector Solve() 
    {
       solution = new(vector.Length);
@@ -410,6 +411,100 @@ public class LOSLUsqSolver : SLAE
 
       }
 
+      return result;
+   }
+
+}
+
+public class BCGSTABSolver : SLAE
+{
+   private double eps = 1e-16;
+   private int maxIters = 2000;
+   public override Vector Solve()
+   {
+      solution = new(vector.Length);
+      Vector.Copy(vector, solution);
+
+      SparseMatrix matrixLU = new(matrix.Size, matrix.Jg.Length);
+      SparseMatrix.Copy(matrix, matrixLU);
+
+      LU(matrixLU);
+
+
+      
+      return solution;
+   }
+
+   protected static void LU(SparseMatrix Matrix)
+   {
+      for (int i = 0; i < Matrix.Size; i++)
+      {
+
+         for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
+         {
+            int jCol = Matrix.Jg[j];
+            int jk = Matrix.Ig[jCol];
+            int k = Matrix.Ig[i];
+
+            int sdvig = Matrix.Jg[Matrix.Ig[i]] - Matrix.Jg[Matrix.Ig[jCol]];
+
+            if (sdvig > 0)
+               jk += sdvig;
+            else
+               k -= sdvig;
+
+            double sumL = 0.0;
+            double sumU = 0.0;
+
+            for (; k < j && jk < Matrix.Ig[jCol + 1]; k++, jk++)
+            {
+               sumL += Matrix.Ggl[k] * Matrix.Ggu[jk];
+               sumU += Matrix.Ggu[k] * Matrix.Ggl[jk];
+            }
+
+            Matrix.Ggl[j] -= sumL;
+            Matrix.Ggu[j] -= sumU;
+            Matrix.Ggu[j] /= Matrix.Di[jCol];
+         }
+
+         double sumD = 0.0;
+         for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
+            sumD += Matrix.Ggl[j] * Matrix.Ggu[j];
+
+         Matrix.Di[i] -= sumD;
+      }
+   }
+
+   protected static Vector DirElim(SparseMatrix Matrix, Vector b)
+   {
+      Vector result = new Vector(b.Length);
+      Vector.Copy(b, result);
+
+      for (int i = 0; i < Matrix.Size; i++)
+      {
+         for (int j = Matrix.Ig[i]; j < Matrix.Ig[i + 1]; j++)
+         {
+            result[i] -= Matrix.Ggl[j] * result[Matrix.Jg[j]];
+         }
+
+         result[i] /= Matrix.Di[i];
+      }
+
+      return result;
+   }
+
+   protected static Vector BackSub(SparseMatrix Matrix, Vector b)
+   {
+      Vector result = new Vector(b.Length);
+      Vector.Copy(b, result);
+
+      for (int i = Matrix.Size - 1; i >= 0; i--)
+      {
+         for (int j = Matrix.Ig[i + 1] - 1; j >= Matrix.Ig[i]; j--)
+         {
+            result[Matrix.Jg[j]] -= Matrix.Ggu[j] * result[i];
+         }
+      }
       return result;
    }
 
