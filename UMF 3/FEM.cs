@@ -249,7 +249,7 @@ public class FEM
 
    public void PrintSolution()
    {
-      Console.WriteLine(slae.GetType().ToString() == "UMF_3.LUSolver"? "LU" : "LOS");
+      Console.WriteLine(GetSolverName(slae.GetType().ToString()));
       //Console.WriteLine("Численное решение");
       for (int i = 0; i < solution.Length; i++)
       {
@@ -281,14 +281,14 @@ public class FEM
       Console.WriteLine($"{inaccuracySin.Norm()/exactSolution.Norm()}");
       Console.WriteLine("Относительная погрешность косинус-компоненты");
       Console.WriteLine($"{inaccuracyCos.Norm() / exactSolution.Norm()}");
-      Console.WriteLine("Время");
-      Console.WriteLine($"{slae.time}");
+      Console.WriteLine($"Время: {slae.time}");
+      Console.WriteLine($"Количество итераций : {slae.lastIter}");
       Console.WriteLine();
    }
 
    public void PrintSolution(StreamWriter sw)
    {
-      sw.WriteLine(slae.GetType().ToString() == "UMF_3.LUSolver" ? "LU" : "LOS");
+      sw.WriteLine(GetSolverName(slae.GetType().ToString()));
       //Console.WriteLine("Численное решение");
       for (int i = 0; i < solution.Length; i++)
       {
@@ -320,8 +320,15 @@ public class FEM
       sw.WriteLine($"{inaccuracySin.Norm() / exactSolution.Norm()}");
       sw.WriteLine("Относительная погрешность косинус-компоненты");
       sw.WriteLine($"{inaccuracyCos.Norm() / exactSolution.Norm()}");
-      sw.WriteLine("Время");
-      sw.WriteLine($"{slae.time}");
+      sw.WriteLine($"Время: {slae.time}");
+      sw.WriteLine($"Количество итераций : {slae.lastIter}");
       sw.WriteLine();
+   }
+
+   private string GetSolverName(string solverName)
+   {
+      string result = solverName[6..];
+      result = result.Replace("Solver", ":");
+      return result;
    }
 }
